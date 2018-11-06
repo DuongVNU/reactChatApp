@@ -1,6 +1,6 @@
 import React, {Component} from 'react';
 import SideBar from "./SideBar";
-import {COMMUNITY_CHAT, MESSAGE_RECEIVED, MESSAGE_SENT, TYPING} from './../../Events'
+import {COMMUNITY_CHAT, MESSAGE_RECEIVED, MESSAGE_SENT, PRIVATE_MESAGE, TYPING} from './../../Events'
 import MessageInput from "./MessageInput";
 import Messages from "./Message";
 import ChatHeading from "./ChatHeading";
@@ -13,14 +13,30 @@ export default class ChatContainer extends Component {
 			activeChat: null
 		};
 	}
+	
 	componentDidMount() {
 		const {socket} = this.props;
-		socket.emit(COMMUNITY_CHAT, this.resetChat)
+		this.initSocket(socket);
 	};
+	
+	initSocket(socket) {
+		const {user} = this.props;
+		socket.emit(COMMUNITY_CHAT, this.resetChat);
+		socket.on(PRIVATE_MESAGE, this.addChat);
+		socket.on('connect', () => {
+			socket.emit(COMMUNITY_CHAT, this.resetChat())
+		});
+	}
+	
+	sendOpenPrivateMessage = (receiver) => {
+		const {socket, user} = this.props;
+		socket.emit(PRIVATE_MESAGE, {receiver, sender: user.name})
+	};
+	
 	resetChat = (chat) => {
 		return this.addChat(chat, true)
 	};
-	addChat = (chat, reset) => {
+	addChat = (chat, reset = false) => {
 		console.log(chat);
 		const {socket} = this.props;
 		const {chats} = this.state;
@@ -56,20 +72,20 @@ export default class ChatContainer extends Component {
 	 * Update the typing of chat with id passed in.
 	 * @param chatId {number}
 	 */
-	updateTypingInChat(chatId){
-		return ({isTyping, user}) =>{
-			if(user !== this.props.user.name){
-				const { chats } = this.state;
+	updateTypingInChat(chatId) {
+		return ({isTyping, user}) => {
+			if (user !== this.props.user.name) {
+				const {chats} = this.state;
 				let newChats = chats.map((chat) => {
-					if(chat.id === chatId){
-						if(isTyping && !chat.typingUsers.includes(user))
+					if (chat.id === chatId) {
+						if (isTyping && !chat.typingUsers.includes(user))
 							chat.typingUsers.push(user);
-						else if(!isTyping && chat.typingUsers.includes(user))
+						else if (!isTyping && chat.typingUsers.includes(user))
 							chat.typingUsers = chat.typingUsers.filter(u => u !== user)
 					}
 					return chat;
 				});
-				this.setState({chats:newChats})
+				this.setState({chats: newChats})
 			}
 		}
 	}
@@ -95,9 +111,6 @@ export default class ChatContainer extends Component {
 	};
 	
 	
-	
-	
-	
 	setActiveChat = (activeChat) => {
 		this.setState({activeChat})
 	};
@@ -113,6 +126,7 @@ export default class ChatContainer extends Component {
 					user={user}
 					activeChat={activeChat}
 					setActiveChat={this.setActiveChat}
+					onsendPrivateMessage={this.sendOpenPrivateMessage}
 				/>
 				<div className="chat-room-container">
 					{
